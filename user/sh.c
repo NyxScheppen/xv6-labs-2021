@@ -128,6 +128,7 @@ runcmd(struct cmd *cmd)
     break;
   }
   exit(0);
+  __builtin_unreachable();
 }
 
 int
