@@ -28,7 +28,6 @@ main(int argc, char *argv[])
         fprintf(2, "fork failed\n");
         exit(1);
     } else if (pid == 0) {
-        // === 子进程代码 ===
         // 关闭子进程不使用的写端（父->子 管道的写端）
         close(p1[1]);
         // 关闭子进程不使用的读端（子->父 管道的读端）
@@ -58,7 +57,6 @@ main(int argc, char *argv[])
         close(p2[1]);
         exit(0);
     } else {
-        // === 父进程代码 ===
         // 关闭父进程不使用的读端（父->子 管道的读端）
         close(p1[0]);
         // 关闭父进程不使用的写端（子->父 管道的写端）
