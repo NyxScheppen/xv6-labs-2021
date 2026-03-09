@@ -105,4 +105,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int mask;                    // Trace mask
+};
+
+struct sysinfo {
+  uint64 freemem; // the freemem field should be set to the number of bytes of free memory
+  uint64 nproc; // the nproc field should be set to the number of processes whose state is not UNUSED
+  // and I should switch job 
 };

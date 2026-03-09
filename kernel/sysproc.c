@@ -95,3 +95,34 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void)
+{
+  int mask;
+  // 获取系统调用参数
+  if(argint(0, &mask) < 0)
+    return -1;
+  // 将mask保存到当前进程的proc结构体中
+  struct proc *p = myproc();
+  p->mask = mask;
+  // 返回0表示成功
+  return 0;
+}
+
+uint64
+sys_sysinfo(void)
+{
+  uint64 addr;
+  // argaddr函数用于获取系统调用参数，这里获取一个地址参数，指向用户空间的sysinfo结构体
+  if(argaddr(0, &addr) < 0)
+    return -1;   
+  struct proc *p = myproc();
+  struct sysinfo info;
+  info.freemem = kmemCount();
+  info.nproc = procCount();
+  // 将sysinfo结构体复制到用户空间，地址由addr参数指定
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+  return 0;
+}
