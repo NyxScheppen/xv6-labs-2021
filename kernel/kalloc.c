@@ -86,7 +86,7 @@ kmemCount(void){
   struct run *r;
   int count = 0;
   // 遍历空闲链表，统计空闲页的数量
-  acquire(&kmem.lock);
+  acquire(&kmem.lock); // 获取锁，确保在统计过程中不会有其他线程修改空闲链表
   r = kmem.freelist;
   while(r){
     count++;
