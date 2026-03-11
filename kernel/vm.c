@@ -434,16 +434,20 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 void
-vmprint(pagetable_t pagetable){
+vmprint(pagetable_t pagetable, int level){
   printf("page table %p\n", pagetable);
   for(int i = 0; i < 512; i++){
-    pte_t pte = pagetable[i];
+    pte_t pte = pagetable[i]; // 得到第i个PTE
+    
     if(pte & PTE_V){
-      uint64 child = PTE2PA(pte);
+      uint64 child = PTE2PA(pte); // 得到下一级页表的物理地址
+      
+      for(int j = 0; j < level; j++) printf("..");
+      
       if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
         // 这个PTE指向一个页表
         printf("..%d: pte %p pa %p\n", i, pte, child);
-        vmprint((pagetable_t)child);
+        vmprint((pagetable_t)child, level + 1);
       } else {
         // 这个PTE是一个叶子节点
         printf("..%d: pte %p pa %p\n", i, pte, child);
