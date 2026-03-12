@@ -80,6 +80,36 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
+  uint64 user_buff;
+  uint64 vaddr;
+  int n;
+  // 起始虚拟地址
+  if(argaddr(0, &vaddr) < 0)
+    return -1;
+  // 页数
+  if(argint(1, &n) < 0)
+    return -1;
+  // 用户地址
+  if(argaddr(2, &user_buff) < 0)
+    return -1; 
+
+  struct proc *p = myproc();
+  uint64 mask = 0;
+
+  for(int i = 0; i < n; i++){
+      // 计算第i页的虚拟地址
+      uint64 va = vaddr + i * PGSIZE;
+      // 找到这一页
+      pte_t *pte = walk(p->pagetable, va, 0);
+      // 如果表单项存在，并且
+      if(pte && (*pte & PTE_A)){
+        // 如果这一页被访问过，就把这一页对应的位设为1
+          mask |= (1L << i);
+          // 清除访问位
+          *pte &= ~PTE_A;   
+      }
+  }
+  copyout(p->pagetable, user_buff, (char*)&mask, sizeof(mask));
   return 0;
 }
 #endif
