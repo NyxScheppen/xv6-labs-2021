@@ -127,6 +127,10 @@ found:
     return 0;
   }
 
+  p->sigalarm_handler = 0;
+  p->sigalarm_ticks = 0;
+  p->sigalarm_ticks_count = 0;
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){

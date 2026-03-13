@@ -49,6 +49,21 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
+
+  if(which_dev == 2){
+    // timer interrupt
+    if(p->sigalarm_handler != 0){
+      p->sigalarm_ticks_count++;
+      if(p->sigalarm_ticks_count >= p->sigalarm_ticks){
+        p->sigalarm_ticks_count = 0;
+        // call signal handler
+        memmove(&(p->intr_trap), p->trapframe, sizeof(struct trapframe));
+        p->trapframe->epc = (uint64)p->sigalarm_handler;
+      }
+      yield(); // 让出 CPU 给其他进程，防止一个进程占用 CPU 太久，导致其他进程无法运行 
+    }
+  }
+    
   
   if(r_scause() == 8){
     // system call

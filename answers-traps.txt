@@ -1,0 +1,6 @@
+1. a0,a1,a2 a2 holds 13
+2. main does not call f or g since they are inlined
+3. 0x616
+4. 0x38
+5. He110 World,i = 0x726c6400,no need to
+6. 3, random number(like 114514)
