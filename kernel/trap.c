@@ -49,22 +49,7 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-
-  if(which_dev == 2){
-    // timer interrupt
-    if(p->sigalarm_handler != 0){
-      p->sigalarm_ticks_count++;
-      if(p->sigalarm_ticks_count >= p->sigalarm_ticks){
-        p->sigalarm_ticks_count = 0;
-        // call signal handler
-        memmove(&(p->intr_trap), p->trapframe, sizeof(struct trapframe));
-        p->trapframe->epc = (uint64)p->sigalarm_handler;
-      }
-      yield(); // 让出 CPU 给其他进程，防止一个进程占用 CPU 太久，导致其他进程无法运行 
-    }
-  }
-    
-  
+     
   if(r_scause() == 8){
     // system call
 
@@ -92,8 +77,23 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  if(which_dev == 2){
+    printf("TIMER\n");
+    // timer interrupt
+      if(!(p->alarm_active) && p->alarm_interval > 0){
+        p->alarm_ticks++;
+
+      if(p->alarm_ticks >= p->alarm_interval){
+        p->alarm_ticks = 0;
+        p->alarm_active = 1;
+
+        // 保存trapframe
+        memmove(&(p->intr_trap), p->trapframe, sizeof(struct trapframe));
+        p->trapframe->epc = (uint64)p->alarm_handler;
+      }
+    }
+    yield(); // 让出 CPU 给其他进程，防止一个进程占用 CPU 太久，导致其他进程无法运行 
+  }
 
   usertrapret();
 }

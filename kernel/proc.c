@@ -126,10 +126,10 @@ found:
     release(&p->lock);
     return 0;
   }
-
-  p->sigalarm_handler = 0;
-  p->sigalarm_ticks = 0;
-  p->sigalarm_ticks_count = 0;
+  
+  p->alarm_interval = 0;
+  p->alarm_ticks = 0;
+  p->alarm_handler = 0;
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);

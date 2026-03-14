@@ -108,9 +108,10 @@ sys_sigalarm(void){
     return -1;
 
   struct proc *p = myproc();
-  p->sigalarm_handler = (void (*)(void))handler;
-  p->sigalarm_ticks = ticks;
-  p->sigalarm_ticks_count = 0;
+  p->alarm_interval = ticks;
+  p->alarm_handler = handler;
+  p->alarm_ticks = 0;
+  p->alarm_active = 0;
   return 0;
 }
 
@@ -118,9 +119,8 @@ uint64
 sys_sigreturn(void){
   // 为进程将 trapframe 恢复到信号处理前的状态
   struct proc *p = myproc();
-  // 恢复用户程序计数器
-  p->trapframe->epc = p->trapframe->epc - 4;
   // 恢复用户程序的寄存器状态
-  p->trapframe = &(p->intr_trap);
+  memmove(p->trapframe, &p->intr_trap, sizeof(struct trapframe));
+  p->alarm_active = 0;
   return 0;
 }

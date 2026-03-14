@@ -105,8 +105,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  void (*sigalarm_handler)(void); // Signal alarm handler
-  int sigalarm_ticks;          // Number of ticks between alarms
-  int sigalarm_ticks_count;    // Number of ticks since last alarm
+  int alarm_interval;          // 间隔多少 ticks 触发一次信号处理  
+  int alarm_ticks;             // 已经过了多少 ticks 了  
+  uint64 alarm_handler;        // 信号处理函数的地址
+  int alarm_active;          // 是否正在处理信号
   struct trapframe intr_trap;
 };
