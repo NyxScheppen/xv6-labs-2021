@@ -1,0 +1,3 @@
+1：put(1,2)
+2：get(1)
+if key 1 doesn't exist,and the thread 2 is faster than 1,then there will be a missing key

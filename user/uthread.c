@@ -12,12 +12,17 @@
 
 
 struct thread {
-  char       stack[STACK_SIZE]; /* the thread's stack */
-  int        state;             /* FREE, RUNNING, RUNNABLE */
+  uint64 ra;
+  uint64 sp;
+  uint64 s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
+
+  char stack[STACK_SIZE];   // 放后面！
+  int state;
+  void (*func)();
 };
 struct thread all_thread[MAX_THREAD];
 struct thread *current_thread;
-extern void thread_switch(uint64, uint64);
+extern void thread_switch(struct thread *old, struct thread *new);
               
 void 
 thread_init(void)
@@ -58,12 +63,16 @@ thread_schedule(void)
     next_thread->state = RUNNING;
     t = current_thread;
     current_thread = next_thread;
-    /* YOUR CODE HERE
-     * Invoke thread_switch to switch from t to next_thread:
-     * thread_switch(??, ??);
-     */
+    thread_switch(t, next_thread);
   } else
     next_thread = 0;
+}
+
+void
+thread_start() {
+    current_thread->func(); // 执行线程的主函数
+    current_thread->state = FREE;
+    thread_schedule();
 }
 
 void 
@@ -75,7 +84,12 @@ thread_create(void (*func)())
     if (t->state == FREE) break;
   }
   t->state = RUNNABLE;
-  // YOUR CODE HERE
+  // 设置线程的入口函数地址为 func
+  t->func = func;
+  // 设置线程的返回地址为 thread_start
+  t->ra = (uint64)thread_start;
+  // 设置线程的栈顶地址为 t->stack + STACK_SIZE
+  t->sp = (uint64)t->stack + STACK_SIZE;
 }
 
 void 
