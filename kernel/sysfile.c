@@ -287,10 +287,12 @@ uint64
 sys_open(void)
 {
   char path[MAXPATH];
+  char target[MAXPATH];
   int fd, omode;
   struct file *f;
   struct inode *ip;
   int n;
+  int depth;
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
@@ -304,24 +306,61 @@ sys_open(void)
       return -1;
     }
   } else {
+    // 读取路径对应的 inode，如果失败就清理现场并返回错误
     if((ip = namei(path)) == 0){
       end_op();
       return -1;
     }
-    ilock(ip);
+    // 把 path 对应的中间 inode，转换成真正最终要打开的 inode。
+    for(depth = 0; depth < 10; depth++){
+      ilock(ip);
+
+      if(ip->type != T_SYMLINK || (omode & O_NOFOLLOW)){
+        break;
+      }
+
+      if(ip->size <= 0 || ip->size >= MAXPATH){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+
+      if(readi(ip, 0, (uint64)target, 0, ip->size) != ip->size){
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+
+      target[ip->size] = '\0';
+
+      iunlockput(ip);
+
+      if((ip = namei(target)) == 0){
+        end_op();
+        return -1;
+      }
+    }
+
+    if(depth >= 10){
+      iput(ip);
+      end_op();
+      return -1;
+    }
+    // 只能以只读方式打开目录
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
       return -1;
     }
   }
-
+  // 设备文件的主设备号必须合法
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
     return -1;
   }
 
+  // 给这次 open 分配内核对象，如果失败就清理现场。
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
@@ -330,6 +369,7 @@ sys_open(void)
     return -1;
   }
 
+  // 根据 inode 类型，决定这个打开对象到底是什么类型的文件
   if(ip->type == T_DEVICE){
     f->type = FD_DEVICE;
     f->major = ip->major;
@@ -337,10 +377,12 @@ sys_open(void)
     f->type = FD_INODE;
     f->off = 0;
   }
+  // 把 inode 挂到 file 上
   f->ip = ip;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 
+  // 如果打开时带了 O_TRUNC，并且它是普通文件，那就把文件内容清空。
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
@@ -482,5 +524,34 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void){
+  char target[MAXPATH], linkpath[MAXPATH];
+  struct inode *ip;
+
+  // 检查参数是否合法
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, linkpath, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  ip = create(linkpath, T_SYMLINK, 0, 0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+  // 将目标路径写入符号链接的内容中
+  // 如果写入失败，清理资源并返回错误
+  if(writei(ip, 0, (uint64)target, 0, strlen(target)) != strlen(target)){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  // 成功创建符号链接，释放锁并结束操作
+  iunlockput(ip);
+  end_op();
   return 0;
 }

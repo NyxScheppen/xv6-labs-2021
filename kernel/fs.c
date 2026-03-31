@@ -365,15 +365,8 @@ iunlockput(struct inode *ip)
   iput(ip);
 }
 
-// Inode content
-//
-// The content (data) associated with each inode is stored
-// in blocks on the disk. The first NDIRECT block numbers
-// are listed in ip->addrs[].  The next NINDIRECT blocks are
-// listed in block ip->addrs[NDIRECT].
-
-// Return the disk block address of the nth block in inode ip.
-// If there is no such block, bmap allocates one.
+// 给定文件内第 bn 个逻辑块，返回它在磁盘上的实际块号。
+// 如果这个块还没分配，而且当前是在写文件，它还会顺手帮你分配。
 static uint
 bmap(struct inode *ip, uint bn)
 {
@@ -381,6 +374,7 @@ bmap(struct inode *ip, uint bn)
   struct buf *bp;
 
   if(bn < NDIRECT){
+    // 如果是 0，说明这个逻辑块还没有分配磁盘块
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
     return addr;
@@ -391,10 +385,44 @@ bmap(struct inode *ip, uint bn)
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
+    // 读出 indirect block
     bp = bread(ip->dev, addr);
+    // 把它里面的数据强制看成 uint 数组
     a = (uint*)bp->data;
+    // 如果这个逻辑块还没有分配磁盘块，就分配一个
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
+      // 告诉文件系统这个块被修改了，要记日志。
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+
+  bn -= NINDIRECT;
+  // NINDIRECT代表每页有多少块
+  int double_indirect_index = bn / NINDIRECT;
+  int indirect_index = bn % NINDIRECT;
+  
+  if(bn < NDOUBLE_INDIRECT){
+    // Load double-indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT+1]) == 0)
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+
+    // Load indirect block, allocating if necessary.
+    if((addr = a[double_indirect_index]) == 0){
+      a[double_indirect_index] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    // 读出 indirect block
+    brelse(bp);
+
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[indirect_index]) == 0){
+      a[indirect_index] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
@@ -430,6 +458,29 @@ itrunc(struct inode *ip)
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  if(ip->addrs[NDIRECT+1]){
+    // 读出 double-indirect block
+    bp = bread(ip->dev, ip->addrs[NDIRECT+1]);
+    // 把它里面的数据强制看成 uint 数组
+    a = (uint*)bp->data;
+    // NINDIRECT代表每页有多少块
+    for(i = 0; i < NINDIRECT; i++){
+      if(a[i]){
+        struct buf *bp2 = bread(ip->dev, a[i]);
+        uint *a2 = (uint*)bp2->data;
+        for(j = 0; j < NINDIRECT; j++){
+          if(a2[j])
+            bfree(ip->dev, a2[j]);
+        }
+        brelse(bp2);
+        bfree(ip->dev, a[i]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT+1]);
+    ip->addrs[NDIRECT+1] = 0;
   }
 
   ip->size = 0;
