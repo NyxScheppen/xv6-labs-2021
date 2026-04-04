@@ -135,6 +135,8 @@ found:
     return 0;
   }
 
+  p->maxaddr = TRAPFRAME;
+  
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -288,7 +290,7 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
-
+  np->maxaddr = p->maxaddr;
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
@@ -301,6 +303,12 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
+  for (int i = 0; i < NVMA; i++) {
+    np->vma[i] = p->vma[i];
+    if (np->vma[i].used) {
+      filedup(np->vma[i].f);
+    }
+  }
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
@@ -350,6 +358,12 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+
+  for(int i = 0; i < NVMA; i++){
+    if(p->vma[i].used){
+      do_munmap(p, p->vma[i].addr, p->vma[i].length);
     }
   }
 
