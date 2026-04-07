@@ -9,10 +9,14 @@
 #include "net.h"
 
 #define TX_RING_SIZE 16
+// 发送包的描述符Ring和mbuf指针数组。
+// 每个描述符对应一个mbuf，描述符里记录了这个mbuf的地址和长度等信息。
 static struct tx_desc tx_ring[TX_RING_SIZE] __attribute__((aligned(16)));
 static struct mbuf *tx_mbufs[TX_RING_SIZE];
 
 #define RX_RING_SIZE 16
+// 收包的描述符Ring和mbuf指针数组。
+// 每个描述符对应一个mbuf，描述符里记录了这个mbuf的地址和长度等信息。
 static struct rx_desc rx_ring[RX_RING_SIZE] __attribute__((aligned(16)));
 static struct mbuf *rx_mbufs[RX_RING_SIZE];
 
@@ -97,15 +101,20 @@ e1000_transmit(struct mbuf *m)
 {
   acquire(&e1000_lock);
 
-  int idx = regs[E1000_TDT];
+  // idx是下一个要发送的描述符的索引
+  int idx = regs[E1000_TDT]; // TDT指向下一个要发送的描述符
+
+  // 只有当上一个包已经被发送了，才可以放新的包
   if((tx_ring[idx].status & E1000_TXD_STAT_DD) == 0){
     release(&e1000_lock);
     return -1;
   }
 
+  // 如果之前的mbuf还在，就释放它
   if(tx_mbufs[idx] != 0)
     mbuffree(tx_mbufs[idx]);
 
+  // 把新的mbuf放在tx_ring里
   tx_mbufs[idx] = m;
   tx_ring[idx].addr = (uint64)m->head;
   tx_ring[idx].length = m->len;
@@ -125,8 +134,10 @@ e1000_recv(void)
   // 把新收入的包交给net_rx处理
   
   while(1) {
+    // idx是下一个要处理的描述符的索引
     int idx = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
     struct rx_desc cur = rx_ring[idx];
+    // 只有当这个描述符里有新包时才处理，否则就退出循环
     if((cur.status & E1000_RXD_STAT_DD) == 0) 
       break;
     struct mbuf *m = rx_mbufs[idx];
